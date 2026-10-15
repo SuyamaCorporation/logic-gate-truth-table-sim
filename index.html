@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logic Gate Truth Table Simulator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4">
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-bold text-center mb-2 text-blue-400">Logic Gate Truth Table Simulator</h1>
+  <p class="text-center text-gray-400 text-sm mb-6">Select a gate and number of inputs to generate truth table</p>
+
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div>
+      <label for="gate" class="block text-xs text-gray-400 mb-1">Logic Gate</label>
+      <select id="gate" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2">
+        <option value="AND">AND</option>
+        <option value="OR">OR</option>
+        <option value="NOT">NOT</option>
+        <option value="XOR">XOR</option>
+        <option value="NAND">NAND</option>
+        <option value="NOR">NOR</option>
+        <option value="XNOR">XNOR</option>
+      </select>
+    </div>
+    <div>
+      <label for="inputs" class="block text-xs text-gray-400 mb-1">Number of Inputs</label>
+      <select id="inputs" class="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2">
+        <option value="1">1 input</option>
+        <option value="2" selected>2 inputs</option>
+        <option value="3">3 inputs</option>
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button onclick="generate()" class="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium">Generate</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div>
+      <div class="bg-gray-800 rounded p-4 mb-4">
+        <h2 class="text-sm font-semibold text-yellow-400 mb-3">Gate Symbol</h2>
+        <canvas id="gateCanvas" width="200" height="120" aria-label="Logic gate diagram"></canvas>
+        <div id="gateDesc" class="mt-2 text-xs text-gray-400"></div>
+      </div>
+    </div>
+    <div>
+      <div class="bg-gray-800 rounded p-4">
+        <h2 class="text-sm font-semibold text-yellow-400 mb-3">Truth Table</h2>
+        <div id="truthTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-gray-800 rounded p-4 mt-4">
+    <h2 class="text-sm font-semibold text-purple-400 mb-2">Boolean Expression</h2>
+    <div id="boolExpr" class="font-mono text-green-300 text-lg"></div>
+  </div>
+</div>
+
+<script>
+const gateDescs = {
+  AND: 'Output is 1 only when ALL inputs are 1',
+  OR: 'Output is 1 when ANY input is 1',
+  NOT: 'Output is the inverse of the input (1 input only)',
+  XOR: 'Output is 1 when inputs DIFFER (odd number of 1s)',
+  NAND: 'NOT AND — inverse of AND gate',
+  NOR: 'NOT OR — inverse of OR gate',
+  XNOR: 'NOT XOR — output is 1 when inputs are EQUAL',
+};
+
+const boolExprs = {
+  AND: (n) => n === 1 ? 'Y = A' : n === 2 ? 'Y = A · B' : 'Y = A · B · C',
+  OR:  (n) => n === 1 ? 'Y = A' : n === 2 ? 'Y = A + B' : 'Y = A + B + C',
+  NOT: () => 'Y = Ā (NOT A)',
+  XOR: (n) => n === 2 ? 'Y = A ⊕ B' : 'Y = A ⊕ B ⊕ C',
+  NAND: (n) => n === 2 ? 'Y = ‾(A · B)' : 'Y = ‾(A · B · C)',
+  NOR:  (n) => n === 2 ? 'Y = ‾(A + B)' : 'Y = ‾(A + B + C)',
+  XNOR: (n) => n === 2 ? 'Y = ‾(A ⊕ B)' : 'Y = ‾(A ⊕ B ⊕ C)',
+};
+
+function evaluate(gate, inputs) {
+  switch(gate) {
+    case 'AND':  return inputs.every(x => x) ? 1 : 0;
+    case 'OR':   return inputs.some(x => x) ? 1 : 0;
+    case 'NOT':  return inputs[0] ? 0 : 1;
+    case 'XOR':  return inputs.reduce((a,b) => a^b, 0);
+    case 'NAND': return inputs.every(x => x) ? 0 : 1;
+    case 'NOR':  return inputs.some(x => x) ? 0 : 1;
+    case 'XNOR': return inputs.reduce((a,b) => a^b, 0) ? 0 : 1;
+  }
+}
+
+function generate() {
+  const gate = document.getElementById('gate').value;
+  const n = parseInt(document.getElementById('inputs').value);
+  const actualN = gate === 'NOT' ? 1 : n;
+
+  document.getElementById('gateDesc').textContent = gateDescs[gate];
+  document.getElementById('boolExpr').textContent = boolExprs[gate](actualN);
+
+  drawGate(gate, actualN);
+
+  const labels = ['A','B','C'].slice(0, actualN);
+  const rows = Math.pow(2, actualN);
+
+  let html = '<table class="w-full text-sm"><thead><tr>';
+  labels.forEach(l => {
+    html += `<th class="px-3 py-2 text-gray-400 border-b border-gray-600">${l}</th>`;
+  });
+  html += `<th class="px-3 py-2 text-yellow-400 border-b border-gray-600">Y (${gate})</th></tr></thead><tbody>`;
+
+  for (let i = 0; i < rows; i++) {
+    const inputs = [];
+    for (let j = actualN - 1; j >= 0; j--) {
+      inputs.unshift((i >> j) & 1);
+    }
+    const output = evaluate(gate, inputs);
+    const rowClass = output ? 'bg-green-900 bg-opacity-30' : '';
+    html += `<tr class="${rowClass}">`;
+    inputs.forEach(v => {
+      html += `<td class="px-3 py-2 text-center font-mono border-b border-gray-700">${v}</td>`;
+    });
+    html += `<td class="px-3 py-2 text-center font-mono font-bold border-b border-gray-700 ${output ? 'text-green-400' : 'text-red-400'}">${output}</td>`;
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('truthTable').innerHTML = html;
+}
+
+function drawGate(gate, n) {
+  const canvas = document.getElementById('gateCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#60a5fa';
+  ctx.fillStyle = '#1e3a5f';
+  ctx.lineWidth = 2;
+  ctx.font = '14px monospace';
+  ctx.fillStyle = '#93c5fd';
+  ctx.textAlign = 'center';
+
+  const cx = W/2, cy = H/2;
+  // Simplified gate shape
+  ctx.fillStyle = '#1e3a8a';
+  ctx.strokeStyle = '#3b82f6';
+
+  // Gate body
+  ctx.beginPath();
+  if (gate === 'NOT') {
+    ctx.moveTo(cx-30, cy-30);
+    ctx.lineTo(cx+30, cy);
+    ctx.lineTo(cx-30, cy+30);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#3b82f6';
+    ctx.beginPath(); ctx.arc(cx+35, cy, 5, 0, Math.PI*2); ctx.stroke();
+  } else {
+    ctx.roundRect(cx-40, cy-35, 80, 70, 10);
+    ctx.fill(); ctx.stroke();
+  }
+
+  ctx.fillStyle = '#93c5fd';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillText(gate, cx, cy + 5);
+
+  // Input lines
+  ctx.strokeStyle = '#6b7280';
+  ctx.lineWidth = 1.5;
+  if (gate === 'NOT' || n === 1) {
+    ctx.beginPath(); ctx.moveTo(20, cy); ctx.lineTo(cx-30, cy); ctx.stroke();
+    ctx.fillStyle = '#9ca3af'; ctx.font = '11px sans-serif';
+    ctx.fillText('A', 12, cy + 4);
+  } else {
+    const spacing = 20;
+    for (let i = 0; i < n; i++) {
+      const y = cy - (n-1)*spacing/2 + i*spacing;
+      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(cx-40, y); ctx.stroke();
+      ctx.fillStyle = '#9ca3af'; ctx.font = '11px sans-serif';
+      ctx.fillText(['A','B','C'][i], 12, y + 4);
+    }
+  }
+  // Output line
+  ctx.strokeStyle = '#6b7280';
+  const outX = gate === 'NOT' ? cx+40 : cx+40;
+  ctx.beginPath(); ctx.moveTo(outX, cy); ctx.lineTo(W-20, cy); ctx.stroke();
+  ctx.fillStyle = '#fbbf24'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('Y', W-16, cy + 4);
+}
+
+generate();
+document.getElementById('gate').onchange = generate;
+document.getElementById('inputs').onchange = generate;
+</script>
+</body>
+</html>
